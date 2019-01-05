@@ -1,0 +1,28 @@
+[package]
+name = "hako"
+version = "0.1.0"
+authors = ["otonashi1991 <xir.hikaria@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+bincode = "1.0"
+memmap = "0.7"
+actix-web = "0.7"
+tera = "0.11"
+lazy_static = "1.2"
+chrono = "0.4"
+percent-encoding = "1.0"
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'unwind'
+incremental = false
+overflow-checks = false

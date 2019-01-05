@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width,initial-scale=1,maximum-scale=10,user-scalable=no" name="viewport">
+  <meta content="IE=edge" http-equiv="X-UA-Compatible">
+  <meta content="webkit" name="renderer">
+  <meta content="no-siteapp" http-equiv="Cache-Control">
+  <meta http-equiv="x-dns-prefetch-control" content="on">
+  <link rel="dns-prefetch" href="https://bgm.tv/">
+  <title>PrismHako推荐引擎</title>
+  <link href="/common_tiny.css" rel="stylesheet" />
+</head>
+<body lang="zh-hans">
+  <div id="RootBox">
+    <div id="MainBox">
+      <div id="LeftPanel">
+        <div id="LeftPanelAvatar"></div>
+        <div lang="en" id="SiteHeader">PrismHako</div>
+        <div id="AccountBox">
+          <div lang="en" id="LoginInfo">Update = {{ db_date }}<br>Engine = Hako r{{ rev }}<br>dFac = {{ d_fac }}<br>Query = {{ query_time }}</div>
+        </div>
+        <div id="Nav">
+          <a class="NavItem Current" href="/dr/0">动画作品</a>
+        </div>
+      </div>
+      <div id="ContentBox">
+        <div id="PageTitle">全部作品</div>
+        <form id="WorkSearchPanel" data-orig-base="{{ search.base_url }}">
+          <input id="WorkSearchBox" type="search" value="{{ search.kwd_str }}" placeholder="输入查询关键词，空格分隔，前置`-`为排除，前置`*`为要求精确匹配" />
+          <input id="SubmitWorkSearchBox" type="submit" value="搜">
+        </form>
+        <div id="user_box" class="WorkFilterGroup">
+          <div class="GroupTitle">用户：</div>
+          <input id="WorkUserBox" type="text" value="{{ search.user }}" placeholder="用户名或UID" />
+        </div>
+        <div id="r18_box" class="WorkFilterGroup">
+          <div class="GroupTitle">R18：</div>
+          <div class="WorkFilterItem{% if search.r18 == 2 %} Positive{% elif search.r18 == 1 %} Negative{% endif %}">{% if search.r18 == 2 %}是{% elif search.r18 == 1 %}否{% else %}任意{% endif %}</div>
+        </div>
+        <div id="year_box" class="WorkFilterGroup">
+          <div class="GroupTitle"><span>年份：</span></div>
+          <div class="WorkFilterItem{% if search.year.0 %} Positive{% endif %}">(..2000)</div>
+          <div class="WorkFilterItem{% if search.year.1 %} Positive{% endif %}">(2000..2005)</div>
+          <div class="WorkFilterItem{% if search.year.2 %} Positive{% endif %}">(2005..2009)</div>
+          <div class="WorkFilterItem{% if search.year.3 %} Positive{% endif %}">(2009..2015)</div>
+          <div class="WorkFilterItem{% if search.year.4 %} Positive{% endif %}">(2015..)</div>
+          <div class="WorkFilterItem{% if search.year.5 %} Positive{% endif %}">Now</div>
+        </div>
+        <div id="tag_box" class="WorkFilterGroup">
+          <div class="GroupTitle">标签：</div>
+          <div class="WorkFilterItem{% if search.tag.0 == 1 %} Positive{% elif search.tag.0 == 0 %} Negative{% endif %}">奇幻</div>
+          <div class="WorkFilterItem{% if search.tag.1 == 1 %} Positive{% elif search.tag.1 == 0 %} Negative{% endif %}">科幻</div>
+          <div class="WorkFilterItem{% if search.tag.2 == 1 %} Positive{% elif search.tag.2 == 0 %} Negative{% endif %}">冒险</div>
+          <div class="WorkFilterItem{% if search.tag.3 == 1 %} Positive{% elif search.tag.3 == 0 %} Negative{% endif %}">轻小说改</div>
+          <div class="WorkFilterItem{% if search.tag.4 == 1 %} Positive{% elif search.tag.4 == 0 %} Negative{% endif %}">漫画改</div>
+          <div class="WorkFilterItem{% if search.tag.5 == 1 %} Positive{% elif search.tag.5 == 0 %} Negative{% endif %}">游戏改</div>
+          <div class="WorkFilterItem{% if search.tag.6 == 1 %} Positive{% elif search.tag.6 == 0 %} Negative{% endif %}">GAL改</div>
+          <div class="WorkFilterItem{% if search.tag.7 == 1 %} Positive{% elif search.tag.7 == 0 %} Negative{% endif %}">日常</div>
+          <div class="WorkFilterItem{% if search.tag.8 == 1 %} Positive{% elif search.tag.8 == 0 %} Negative{% endif %}">搞笑</div>
+          <div class="WorkFilterItem{% if search.tag.9 == 1 %} Positive{% elif search.tag.9 == 0 %} Negative{% endif %}">里番</div>
+        </div>
+        <div id="WorkSortMode" data-ord="{{ search.ord }}">
+          <a{% if search.ord == 0 or search.ord == 1 %} class="Current"{% endif %} href="{{ search.base_url }}/{% if search.ord == 1 %}ar{% else %}dr{% endif %}/{{ search.curr_skip }}">推荐{% if search.ord == 0 %}↑{% elif search.ord == 1 %}↓{% endif %}</a>
+          <a{% if search.ord == 2 or search.ord == 3 %} class="Current"{% endif %} href="{{ search.base_url }}/{% if search.ord == 3 %}al{% else %}dl{% endif %}/{{ search.curr_skip }}">相关性{% if search.ord == 2 %}↑{% elif search.ord == 3 %}↓{% endif %}</a>
+          <a{% if search.ord == 4 or search.ord == 5 %} class="Current"{% endif %} href="{{ search.base_url }}/{% if search.ord == 5 %}ak{% else %}dk{% endif %}/{{ search.curr_skip }}">评价{% if search.ord == 4 %}↑{% elif search.ord == 5 %}↓{% endif %}</a>
+          <a{% if search.ord == 6 or search.ord == 7 %} class="Current"{% endif %} href="{{ search.base_url }}/{% if search.ord == 7 %}ad{% else %}dd{% endif %}/{{ search.curr_skip }}">日期{% if search.ord == 6 %}↑{% elif search.ord == 7 %}↓{% endif %}</a>
+          <a{% if search.ord == 8 or search.ord == 9 %} class="Current"{% endif %} href="{{ search.base_url }}/{% if search.ord == 9 %}af{% else %}df{% endif %}/{{ search.curr_skip }}">收藏人数{% if search.ord == 8 %}↑{% elif search.ord == 9 %}↓{% endif %}</a>
+        </div>
+        {% if code == 404 %}
+        <div id="ErrMsg"><p>没有找到结果，可能你的关键词、用户名、标签等搜索条件输入有误。<br>注意：收藏动画数量过少的用户无法得到搜索结果是符合预期的</p></div>
+        {% else %}
+        <div id="WorkList">
+          {% for subject in subject_list %}
+          <div class="WorkItem">
+            <div class="Thumb" style="background-image: url('{{ subject.image_url }}')"></div>
+            <div class="ItemRight">
+              <div class="TitleBox">
+                <span class="Title">{{ subject.title_main }}</span><span class="MainTag">{{ subject.sub_type }}</span>
+              </div>
+              {% if subject.title_orig %}<div class="OrigTitle">{{ subject.title_orig }}</div>{% endif %}
+              <div class="FlexFill"></div>
+              <div class="Info">{{ subject.info }}</div>
+              <div class="FlexFill"></div>
+              <div class="SecInfo">Rank {{ subject.rank }}{% if subject.recommend_rate %} / <span class="Ignorable">个体推荐排名</span> {{ subject.recommend_rate }}{% endif %}</div>
+              <div class="InfoBox">
+                <div class="SecInfo">★:{{ subject.star_count }}<span class="Ignorable"> by {{ subject.rating_count }}人</span></div>
+              </div>
+            </div>
+            <a class="BlockClick" href="{{ subject.link_target }}" target="_blank"></a>
+          </div>
+          {% endfor %}
+        </div>
+        <div id="Pager">
+          <div class="PagerItem{% if not pager.min_link %} Disabled{% endif %}"><a href="{{ pager.min_link }}"><span>|&lt;</span></a></div>
+          <div class="PagerItem{% if not pager.prev_link %} Disabled{% endif %}"><a href="{{ pager.prev_link }}"><span>&lt;&lt;</span></a></div>
+          {% for page in pager.page_list %}<div class="PagerItem{% if pager.curr_page == page.0 %} Current{% endif %}{% if not page.1 %} Disabled{% endif %}"><a{% if page.1 %} href="{{ page.1 }}"{% endif %}><span>{{ page.0 }}</span></a></div>{% endfor %}
+          <div class="PagerItem{% if not pager.next_link %} Disabled{% endif %}"><a href="{{ pager.next_link }}"><span>&gt;&gt;</span></a></div>
+          <div class="PagerItem{% if not pager.max_link %} Disabled{% endif %}"><a href="{{ pager.max_link }}"><span>&gt;|</span></a></div>
+        </div>
+        <form id="ManualPager">
+          <input id="PagerValue" type="number" value="{{ pager.curr_page }}" min="1" max="{{ pager.max_page }}" /><span id="ManualPagerBox"><span>&nbsp;/&nbsp;{{ pager.max_page }}</span></span><input id="PagerSubmit" type="submit" value="跳转" />
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    
+    <footer>
+      &copy;<a href="https://tuxzz.org" target="_blank">tuxzz</a><br>
+      <a href="/about" target="_blank">About</a>
+    </footer>
+  </div>
+  <script>(()=>{let t=document.getElementById("WorkSearchBox"),e=document.getElementById("WorkUserBox"),s=document.getElementById("SubmitWorkSearchBox"),i=document.getElementById("year_box"),n=document.getElementById("tag_box"),a=document.getElementById("r18_box"),l=document.getElementById("WorkSortMode"),o=document.getElementById("PagerSubmit"),r=document.getElementById("WorkSearchPanel"),c=document.getElementById("PagerValue");const d=["ar","dr","al","dl","ak","dk","ad","dd","af","df"];!function(t){let e=t.getElementsByClassName("WorkFilterItem");for(let t=0;t<e.length;++t)e[t].addEventListener("click",function(t){this.classList.contains("Positive")?this.classList.remove("Positive"):this.classList.add("Positive")})}(i),function(t){let e=t.getElementsByClassName("WorkFilterItem");for(let t=0;t<e.length;++t)e[t].addEventListener("click",function(t){this.classList.contains("Positive")?(this.classList.remove("Positive"),this.classList.add("Negative")):this.classList.contains("Negative")?this.classList.remove("Negative"):this.classList.add("Positive")})}(n),function(t){let e=t.getElementsByClassName("WorkFilterItem");for(let t=0;t<e.length;++t)e[t].addEventListener("click",function(t){this.classList.contains("Positive")?(this.classList.remove("Positive"),this.classList.add("Negative"),this.innerText="否"):this.classList.contains("Negative")?(this.classList.remove("Negative"),this.innerText="任意"):(this.classList.add("Positive"),this.innerText="是")})}(a),o&&o.addEventListener("click",function(t){let e=parseInt(c.value),s=parseInt(c.min),i=parseInt(c.max);e>=s&&e<=i&&(window.location=r.dataset.origBase+"/"+d[parseInt(l.dataset.ord)]+"/"+25*(e-1),t.stopPropagation(),t.preventDefault())}),s.addEventListener("click",function(s){let o,r=[],c=t.value.trim().split(" ");for(;-1!=(o=c.indexOf(""));)c.splice(o);for(let t=0;t<c.length;++t){let e=c[t];"-*"==e.substr(0,2)||"*-"==e.substr(0,2)?r.push([3,e.substr(2)]):"-"==e[0]?r.push([1,e.substr(1)]):"*"==e[0]?r.push([2,e.substr(1)]):r.push([0,e])}let m=[];{let t=n.getElementsByClassName("WorkFilterItem");for(let e=0;e<t.length;++e){let s=t[e];s.classList.contains("Positive")?m.push([1,s.innerText]):s.classList.contains("Negative")&&m.push([0,s.innerText])}}function u(t){if("Now"==t){let t=1900+(new Date).getYear();return[t,t+1]}let e;if(e=t.match(/^\((\d{4})\.\.(\d{4})\)$/)){return[parseInt(e[1]),parseInt(e[2])]}if(e=t.match(/^\((\d{4})\.\.\)$/)){return[parseInt(e[1]),null]}if(e=t.match(/^\(\.\.(\d{4})\)$/)){return[null,parseInt(e[1])]}{let e=parseInt(t);return[e,e+1]}}let g=[];{let t=i.getElementsByClassName("WorkFilterItem");for(let e=0;e<t.length;++e){let s=t[e];s.classList.contains("Positive")&&g.push(u(s.innerText))}}let h=e.value;h||(h=null);let v=3;{let t=a.getElementsByClassName("WorkFilterItem")[0];t.classList.contains("Positive")?v=2:t.classList.contains("Negative")&&(v=1)}let I=JSON.stringify([r,m,g,h,v]);I.length>127?alert("查询字符串过长，请考虑缩短关键词长度"):(window.location="[[],[],[],null,3]"==I?"/"+d[parseInt(l.dataset.ord)]+"/0":"/search/"+encodeURI(I)+"/"+d[parseInt(l.dataset.ord)]+"/0",s.stopPropagation(),s.preventDefault())})})();</script>
+</body>
+</html>
