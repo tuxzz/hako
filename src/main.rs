@@ -1,4 +1,4 @@
-#![feature(range_contains, duration_as_u128)]
+#![feature(range_contains)]
 
 #[macro_use]
 extern crate serde_derive;
@@ -34,15 +34,7 @@ lazy_static! {
   };
 }
 
-const REV: u32 = 0;
-
-/* Extract-Default Query String */
-/* plain keyword */
-/* r18:yes|no */
-/* year:-?point,+|-?{[|(}from?, to?{)|]},+ */
-/* rank:{[|(}from?, to?{)|]} */
-/* fav:{[|(}from?, to?{)|]} */
-/* tag:-?str,+ */
+const REV: u32 = 1;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct PresentationSubject {
@@ -77,6 +69,7 @@ struct PresentationSearch {
   tag: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8,),
   ord: u8,
   r18: u8,
+  fav: u8,
   base_url: String,
   curr_skip: u32,
 }
@@ -132,7 +125,7 @@ fn encode_sub_type_to_str(t: db::PackedSubjectSubtype) -> &'static str {
   }
 }
 
-fn subject_to_presentation(x: &db::PackedSubject, user_recommend: Option<u16>) -> PresentationSubject {
+fn subject_to_presentation(x: &db::PackedSubject, user_recommend: Option<usize>) -> PresentationSubject {
   PresentationSubject {
     link_target: format!("https://bgm.tv/subject/{}", x.subject_id),
     image_url: format!("https://lain.bgm.tv/pic/cover/{}", &x.image_partial_url),
@@ -149,7 +142,7 @@ fn subject_to_presentation(x: &db::PackedSubject, user_recommend: Option<u16>) -
 
 /* unsearched */
 fn unsearched(info: actix_web::Path<(String, u32,)>) -> impl Responder {
-  let mut code = 200;
+  let code = 200;
   let start_time = Instant::now();
   let (sort_mode_str, n_skip,) = info.into_inner();
 
@@ -172,6 +165,7 @@ fn unsearched(info: actix_web::Path<(String, u32,)>) -> impl Responder {
     tag: (2, 2, 2, 2, 2, 2, 2, 2, 2, 2,),
     ord: encode_sort_mode_str_to_u8(&sort_mode_str),
     r18: 3,
+    fav: 1,
     base_url: String::new(),
     curr_skip: n_skip,
   };
@@ -212,17 +206,25 @@ fn searched(info: actix_web::Path<(String, String, u32,)>) -> impl Responder {
   let (is_sort_ascent, sort_mode) = match parse_sort_mode_str(sort_mode_str.as_str()) { Ok(x) => x, Err(r) => { return r; } };
 
   /* parse search ticket */
-  let (s_kwd_list, s_tag_list, s_year_list, s_user, s_r18) = match serde_json::from_str::<(Vec<(u8, String)>, Vec<(u8, String)>, Vec<(Option<u16>, Option<u16>)>, Option<String>, u8)>(query_str.as_str()) {
+  let (s_kwd_list, s_tag_list, s_year_list, s_user, s_r18, s_fav) = match serde_json::from_str::<(Vec<(u8, String)>, Vec<(u8, String)>, Vec<(Option<u16>, Option<u16>)>, Option<String>, u8, u8)>(query_str.as_str()) {
     Ok(x) => x,
     Err(e) => { return actix_web::HttpResponse::BadRequest().content_type("text/plain").body(format!("Bad query_str: {:?}", e));  }
   };
+  let user_id = s_user.as_ref().map(|u| match u.parse::<u32>() {
+    Ok(uid) => uid,
+    Err(_) => match DB.get_user_id_by_username(u.to_lowercase().as_str()) {
+      Some(uid) => uid,
+      None => 0,
+    },
+  });
+
   let ticket = {
     let keyword_list = s_kwd_list.iter().map(|(opt, kwd)| {
       let a = if *opt & 0b01 == 0 { db::Relation::Include(kwd.to_lowercase().clone()) } else { db::Relation::Exclude(kwd.to_lowercase().clone()) };
       if *opt & 0b10 == 0 { db::SearchMode::PartialMatch(a) } else { db::SearchMode::ExactMatch(a) }
     }).collect::<Vec<_>>();
     let tag_list = s_tag_list.iter().map(|(include, tag)| {
-      let i = DB.get_tag_id_by_name(tag.to_lowercase().as_str()).unwrap_or(u32::max_value());
+      let i = DB.get_tag_id_by_name(tag.as_str()).unwrap_or(u32::max_value());
       if *include == 1 { db::Relation::Include(i) } else { db::Relation::Exclude(i) }
     }).collect::<Vec<_>>();
     let year_list = s_year_list.iter().map(|(from, to)| match from {
@@ -239,13 +241,6 @@ fn searched(info: actix_web::Path<(String, String, u32,)>) -> impl Responder {
         }
       }
     }).collect::<Vec<_>>();
-    let user_id = s_user.as_ref().map(|u| match u.parse::<u32>() {
-      Ok(uid) => uid,
-      Err(_) => match DB.get_user_id_by_username(u.to_lowercase().as_str()) {
-        Some(uid) => uid,
-        None => 0,
-      },
-    });
 
     let r18_mode = match s_r18 {
       0b01 => Some(false),
@@ -253,6 +248,13 @@ fn searched(info: actix_web::Path<(String, String, u32,)>) -> impl Responder {
       0b11 => None,
       _ => return actix_web::HttpResponse::BadRequest().content_type("text/plain").body("Bad r18_mode"),
     };
+    let fav_mode = match s_fav {
+      0b01 => Some(false),
+      0b10 => Some(true),
+      0b11 => None,
+      _ => return actix_web::HttpResponse::BadRequest().content_type("text/plain").body("Bad fav_mode"),
+    };
+    
     db::SearchTicket {
       keyword_list,
       tag_list,
@@ -261,6 +263,7 @@ fn searched(info: actix_web::Path<(String, String, u32,)>) -> impl Responder {
       rating_count: db::SearchRange::RangeFull,
       r18: r18_mode,
       for_user: user_id,
+      fav_mode: fav_mode,
     }
   };
 
@@ -301,12 +304,13 @@ fn searched(info: actix_web::Path<(String, String, u32,)>) -> impl Responder {
     ),
     ord: encode_sort_mode_str_to_u8(&sort_mode_str),
     r18: s_r18,
+    fav: s_fav,
     base_url: format!("/search/{}", percent_query_str),
     curr_skip: n_skip,
   };
 
   let mut context = Context::new();
-  let result = result.into_iter().skip(n_skip as usize).take(25).map(|x| subject_to_presentation(&x.subject, if x.user_recommend == 65535 { None } else { Some(total_subject_count as u16 - x.user_recommend) })).collect::<Vec<_>>();
+  let result = result.into_iter().skip(n_skip as usize).take(25).map(|x| subject_to_presentation(&x.subject, user_id.map(|_| total_subject_count - (x.user_recommend as usize)))).collect::<Vec<_>>();
   context.insert("d_fac", S_D_FAC.as_str());
   context.insert("rev", &REV);
   if code == 200 {
@@ -326,9 +330,10 @@ fn searched(info: actix_web::Path<(String, String, u32,)>) -> impl Responder {
 }
 
 fn main() {
-  DB.subject_iter();
+  &*DB;
   server::new(|| {
     App::new()
+    .handler("/static", actix_web::fs::StaticFiles::new("./static").unwrap().show_files_listing())
     .route("/{sort_mode}/{n_skip}", http::Method::GET, unsearched)
     .route("/search/{query_str}/{sort_mode}/{n_skip}", http::Method::GET, searched)
   }).bind("127.0.0.1:8080").unwrap().run();

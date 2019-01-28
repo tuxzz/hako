@@ -5,6 +5,7 @@
   let year_box = document.getElementById("year_box");
   let tag_box = document.getElementById("tag_box");
   let r18_box = document.getElementById("r18_box");
+  let fav_box = document.getElementById("fav_box");
   let sort_mode = document.getElementById("WorkSortMode");
   let pager_submit = document.getElementById("PagerSubmit");
   let search_panel = document.getElementById("WorkSearchPanel");
@@ -39,7 +40,7 @@
     }
   }
 
-  function bind_r18(e) {
+  function bind_single3(e) {
     let l = e.getElementsByClassName("WorkFilterItem");
     for(let i = 0; i < l.length; ++i) {
       l[i].addEventListener("click", function(ev){
@@ -62,7 +63,8 @@
 
   bind_year(year_box);
   bind_tag(tag_box);
-  bind_r18(r18_box);
+  bind_single3(r18_box);
+  bind_single3(fav_box);
 
   if(pager_submit) {
     pager_submit.addEventListener("click", function(ev){
@@ -154,16 +156,29 @@
       else if(x.classList.contains("Negative"))
         r18_mode = 1;
     }
+
+    let exclude_fav_mode;
+    {
+      let x = fav_box.getElementsByClassName("WorkFilterItem")[0];
+      if(x.classList.contains("Positive"))
+        exclude_fav_mode = 2;
+      else if(x.classList.contains("Negative"))
+        exclude_fav_mode = 1;
+      else
+        exclude_fav_mode = 3;
+    }
     
-    let s = JSON.stringify([kwd_list, tag_list, year_list, u, r18_mode]);
+    let s = JSON.stringify([kwd_list, tag_list, year_list, u, r18_mode, exclude_fav_mode]);
     if(s.length > 127){
       alert("查询字符串过长，请考虑缩短关键词长度");
       return;
     }
-    if(s == "[[],[],[],null,3]")
-    window.location = "/" + ord_map_list[parseInt(sort_mode.dataset.ord)] + "/0";
-    else
-      window.location = "/search/" + encodeURI(s) + "/" + ord_map_list[parseInt(sort_mode.dataset.ord)] + "/0";
+    if(s == "[[],[],[],null,3,1]")
+      window.location = "/dr/0";
+    else {
+      let sort_mode = kwd_list.length > 0 ? "dl" : "dr";
+      window.location = "/search/" + encodeURI(s) + "/" + sort_mode + "/0";
+    }
 
     ev.stopPropagation();
     ev.preventDefault();

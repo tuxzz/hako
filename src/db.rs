@@ -2,6 +2,7 @@ extern crate bincode;
 extern crate memmap;
 
 use std::path::Path;
+use std::io::BufReader;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum PackedSubjectSubtype {
@@ -36,6 +37,7 @@ struct PackedDatabasePersistenceTable {
   subject_packed_list: Vec<PackedSubject>,
   user_id_list: Vec<u32>,
   user_username_list: Vec<String>,
+  user_fav_list: Vec<Vec<u32>>, // Hako r1
   tag_name_list: Vec<String>,
 }
 
@@ -84,12 +86,13 @@ pub struct SearchTicket {
   pub rating_count: SearchRange,
   pub r18: Option<bool>,
   pub for_user: Option<u32>,
+  pub fav_mode: Option<bool>, // Hako r1
 }
 
 pub struct SearchResult<'a> {
   pub subject: &'a PackedSubject,
   pub keyword_relative: f32,
-  pub user_recommend: u16,
+  pub user_recommend: f32,
 }
 
 pub fn match_keyword_exact(kwd: &str, target: &str) -> bool {
@@ -197,7 +200,7 @@ impl <'a> DB<'a> {
     P: AsRef<Path>
   {
     eprintln!("* Load persistence_table");
-    let persistence_table = bincode::deserialize_from::<_, PackedDatabasePersistenceTable>(std::fs::OpenOptions::new().read(true).open(path.as_ref()).unwrap()).unwrap();
+    let persistence_table = bincode::deserialize_from::<_, PackedDatabasePersistenceTable>(BufReader::new(std::fs::OpenOptions::new().read(true).open(path.as_ref()).unwrap())).unwrap();
     assert_eq!(persistence_table.user_id_list.len(), persistence_table.user_username_list.len());
 
     eprintln!("* Load map_table");
@@ -238,9 +241,23 @@ impl <'a> DB<'a> {
     self.persistence_table.subject_packed_list.iter()
   }
 
+  /*pub fn get_subject_by_id(&self, subject_id: u32) -> Option<&PackedSubject> {
+    match self.persistence_table.subject_packed_list.binary_search_by_key(&subject_id, |x| x.subject_id) {
+      Ok(i) => Some(self.persistence_table.subject_packed_list.get(i).unwrap()),
+      _ => None,
+    }
+  }*/
+
   pub fn get_user_id_by_username(&self, username: &str) -> Option<u32> {
     self.persistence_table.user_username_list.iter().enumerate().find(|(_, v)| v.to_lowercase() == username).map(|(i, _)| *self.persistence_table.user_id_list.get(i).unwrap())
   }
+
+  /*pub fn get_user_username_by_id(&self, user_id: u32) -> Option<&str> {
+    match self.persistence_table.user_id_list.binary_search(&user_id) {
+      Ok(i) => Some(self.persistence_table.user_username_list.get(i).unwrap().as_str()),
+      _ => None,
+    }
+  }*/
 
   pub fn get_user_subject_relation(&self, user_id: u32, subject_id: u32) -> Option<u16> {
     match self.persistence_table.user_id_list.binary_search(&user_id) {
@@ -257,14 +274,35 @@ impl <'a> DB<'a> {
     }
   }
 
+  pub fn is_user_fav(&self, user_id: u32, subject_id: u32) -> bool { // Hako r1
+    match self.persistence_table.user_id_list.binary_search(&user_id) {
+      Ok(i_user) => {
+        self.persistence_table.user_fav_list[i_user].contains(&subject_id)
+      },
+      _ => false,
+    }
+  }
+
   pub fn get_tag_id_by_name(&self, name: &str) -> Option<u32> {
-    match self.persistence_table.tag_name_list.binary_search_by_key(&name, |x| x.as_str()) {
+    match self.persistence_table.tag_name_list.binary_search_by(|x| x.to_lowercase().as_str().cmp(&name.to_lowercase())) {
       Ok(i) => Some(i as u32),
       _ => None,
     }
   }
 
   pub fn search_by_ticket(&self, ticket: &SearchTicket) -> Vec<SearchResult> {
+    let cached_ticket_keyword = ticket.keyword_list.iter().map(|x| {
+      match x {
+        SearchMode::ExactMatch(r) => match r {
+          Relation::Include(x) => x,
+          Relation::Exclude(x) => x,
+        },
+        SearchMode::PartialMatch(r) => match r {
+          Relation::Include(x) => x,
+          Relation::Exclude(x) => x,
+        },
+      }.chars().collect::<Vec<_>>()
+    }).collect::<Vec<_>>();
     self.persistence_table.subject_packed_list.iter().filter_map(|subject| {
       // r18
       match ticket.r18 {
@@ -275,6 +313,7 @@ impl <'a> DB<'a> {
         }
         None => {}
       };
+
       // tag
       if !ticket.tag_list.iter().all(|tag| {
         match tag {
@@ -310,30 +349,38 @@ impl <'a> DB<'a> {
       // user
       let user_recommend = match ticket.for_user {
         Some(user_id) => {
+          if let Some(fav_mode) = ticket.fav_mode {
+            let is_fav = self.is_user_fav(user_id, subject.subject_id);
+            if is_fav^fav_mode {
+              return None;
+            }
+          }
           match self.get_user_subject_relation(user_id, subject.subject_id) {
-            Some(relation) => relation,
+            Some(relation) => relation as f32,
             None => { return None; }
           }
         }
-        None => { 65535 }
+        None => { score_mapper(subject) }
       };
 
       // keyword
       let mut keyword_relative = 0.0;
       if !ticket.keyword_list.is_empty() {
-        let name_cache = subject.name.chars().collect::<Vec<_>>();
-        let name_cn_cache = subject.name.chars().collect::<Vec<_>>();
-        for kwd in ticket.keyword_list.iter() {
+        let name = subject.name.to_lowercase();
+        let name_cn = subject.name_cn.to_lowercase();
+        let name_cache = name.chars().collect::<Vec<_>>();
+        let name_cn_cache = name_cn.chars().collect::<Vec<_>>();
+        for (kwd, cached_kwd) in ticket.keyword_list.iter().zip(cached_ticket_keyword.iter()) {
           match kwd {
             SearchMode::ExactMatch(kwd_relation) => {
               match kwd_relation {
                 Relation::Include(x) => {
-                  if !(match_keyword_exact(x.as_str(), subject.name_cn.as_str()) || match_keyword_exact(x.as_str(), subject.name.as_str())) {
+                  if !(match_keyword_exact(x.as_str(), name.as_str()) || match_keyword_exact(x.as_str(), name.as_str())) {
                     return None;
                   }
                 }
                 Relation::Exclude(x) => {
-                  if match_keyword_exact(x.as_str(), subject.name_cn.as_str()) || match_keyword_exact(x.as_str(), subject.name.as_str()) {
+                  if match_keyword_exact(x.as_str(), name_cn.as_str()) || match_keyword_exact(x.as_str(), name.as_str()) {
                     return None;
                   }
                 }
@@ -342,19 +389,20 @@ impl <'a> DB<'a> {
             SearchMode::PartialMatch(kwd_relation) => {
               match kwd_relation {
                 Relation::Include(x) => {
-                  if match_keyword_exact(x.as_str(), subject.name_cn.as_str()) || match_keyword_exact(x.as_str(), subject.name.as_str()) {
+                  if match_keyword_exact(x.as_str(), name_cn.as_str()) || match_keyword_exact(x.as_str(), name.as_str()) {
                     keyword_relative += 1.0;
                   }
-                  let cache = x.chars().collect::<Vec<_>>();
-                  keyword_relative += match_keyword_partial(&cache, &name_cn_cache).max(match_keyword_partial(&cache, &name_cache));
+                  keyword_relative += match_keyword_partial(cached_kwd, &name_cn_cache).max(match_keyword_partial(cached_kwd, &name_cache));
                 }
                 Relation::Exclude(x) => {
-                  if match_keyword_exact(x.as_str(), subject.name_cn.as_str()) || match_keyword_exact(x.as_str(), subject.name.as_str()) {
+                  if match_keyword_exact(x.as_str(), name_cn.as_str()) || match_keyword_exact(x.as_str(), name.as_str()) {
                     keyword_relative -= 1.0;
                   }
-                  let cache = x.chars().collect::<Vec<_>>();
-                  keyword_relative -= match_keyword_partial(&cache, &name_cn_cache).max(match_keyword_partial(&cache, &name_cache));
+                  keyword_relative -= match_keyword_partial(cached_kwd, &name_cn_cache).max(match_keyword_partial(cached_kwd, &name_cache));
                 }
+              }
+              if keyword_relative <= 0.0 {
+                return None;
               }
             },
           }
